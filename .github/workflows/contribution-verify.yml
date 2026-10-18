@@ -1,0 +1,69 @@
+name: Verify RTF prior list
+on:
+  push:
+    branches: [verify/rtf-prior-list]
+permissions:
+  contents: read
+concurrency:
+  group: contribution-rtf-prior-list
+  cancel-in-progress: false
+env:
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_PROFILE_TEST_DEBUG: '0'
+  CARGO_BUILD_JOBS: '2'
+  CARGO_TERM_COLOR: never
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Build and software rendering dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgtk-3-dev libfontconfig1-dev libfreetype-dev libvulkan1 mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - name: Baseline must fail the behavioral assertion
+        shell: bash
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD | tee evidence/verification-sha.txt
+          rustc -Vv | tee evidence/toolchain.txt
+          cp crates/formats/src/rtf.rs /tmp/rtf-fixed.rs
+          trap 'cp /tmp/rtf-fixed.rs crates/formats/src/rtf.rs' EXIT
+          git show d588e0b87329975d0b06a9cf91e4d7d2ebacb0f8:crates/formats/src/rtf.rs > crates/formats/src/rtf.rs
+          set +e
+          cargo test --locked -p wordcraft-engine --test rtf_prior_list -- --nocapture 2>&1 | tee evidence/baseline.log
+          result=${PIPESTATUS[0]}
+          set -e
+          test "$result" -ne 0
+          grep -F 'test result: FAILED. 0 passed; 1 failed;' evidence/baseline.log
+          grep -F 'review.rejectAll, old=Some(true), new=Some(false), level=0, saves=1' evidence/baseline.log
+      - name: Identical regression on fixed source
+        run: |
+          cargo test --locked -p wordcraft-engine --test rtf_prior_list -- --nocapture 2>&1 | tee evidence/fixed.log
+          grep -F 'test result: ok. 1 passed; 0 failed;' evidence/fixed.log
+      - name: Repository required gates
+        run: |
+          mkdir -p /tmp/wordcraft-runtime
+          chmod 700 /tmp/wordcraft-runtime
+          export XDG_RUNTIME_DIR=/tmp/wordcraft-runtime
+          cargo xtask ci 2>&1 | tee evidence/ci.log
+      - name: Source and disk receipt
+        if: always()
+        run: |
+          git diff --exit-code
+          df -h
+          du -sh target || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rtf-prior-list-evidence
+          path: evidence/
+          retention-days: 3
