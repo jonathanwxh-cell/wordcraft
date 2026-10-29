@@ -4,9 +4,9 @@ use super::types::{
     RevMark, clean_text, dropped, ruby_object,
 };
 use super::{
-    AbstractNum, Arc, Block, Blocks, Border, BorderStyle, Borders, CellProps, CharProps, Document, InlineObject, Level, ListKind, Num, NumRef, OBJ,
-    ParaProps, Paragraph, PropChange, Revision, RevisionKind, Rgb, RowProps, Run, Style, StyleKind, Table, TextColor, Underline, VMerge, VertAlign,
-    levels_for, para_block,
+    AbstractNum, Arc, Block, Blocks, Border, BorderStyle, Borders, CellProps, CharProps, Document, InlineObject, Level, ListKind, Num, NumFormat,
+    NumRef, OBJ, ParaProps, Paragraph, PropChange, Revision, RevisionKind, Rgb, RowProps, Run, Style, StyleKind, Table, TextColor, Underline, VMerge,
+    VertAlign, levels_for, para_block,
 };
 
 pub fn char_props(f: &Fmt) -> CharProps {
